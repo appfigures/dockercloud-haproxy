@@ -16,7 +16,7 @@ class LegacyLinkSpecs(Specs):
 
     @staticmethod
     def _parse_service_aliases(envvars):
-        service_aliases = []
+        service_aliases = list(haproxy.config.ADDITIONAL_BACKENDS.keys())
         for key, value in envvars.iteritems():
             match = haproxy.config.SERVICE_ALIAS_MATCH.search(key)
             if match:
@@ -40,7 +40,6 @@ class LegacyLinkSpecs(Specs):
         # generate empty details if there is no environment variables set in the application services
         for service_alias in set(service_aliases) - set(details.iterkeys()):
             env_parser.parse(service_alias + "_ENV_", "")
-
         return env_parser.get_details()
 
     @staticmethod

@@ -39,6 +39,8 @@ def get_uuid_from_resource_uri(uri):
 
 
 def save_to_file(name, content):
+    if config.DRYRUN:
+      return True
     try:
         with open(name, 'w') as f:
             f.write(content)

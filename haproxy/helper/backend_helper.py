@@ -1,6 +1,6 @@
 import re
 
-from haproxy.config import HEALTH_CHECK, HTTP_BASIC_AUTH, EXTRA_ROUTE_SETTINGS
+from haproxy.config import HEALTH_CHECK, HTTP_BASIC_AUTH, EXTRA_ROUTE_SETTINGS, ADDITIONAL_BACKENDS
 from haproxy.utils import get_service_attribute
 
 
@@ -20,10 +20,16 @@ def get_backend_section(details, routes, vhosts, service_alias, routes_added):
     backend.extend(backend_routes)
     return backend
 
+def merge_with_additional_routes(routes):
+  if not routes:
+    routes = {}
+  all_services = set(routes.keys() + ADDITIONAL_BACKENDS.keys())
+  for service in all_services:
+    yield service, routes.get(service, []) + ADDITIONAL_BACKENDS.get(service, [])
 
 def get_backend_routes(route_setting, is_sticky, routes, routes_added, service_alias):
     backend_routes = []
-    for _service_alias, routes in routes.iteritems():
+    for _service_alias, routes in merge_with_additional_routes(routes):
         if not service_alias or _service_alias == service_alias:
             addresses_added = []
             for route in routes:
@@ -40,10 +46,13 @@ def get_backend_routes(route_setting, is_sticky, routes, routes_added, service_a
                     if route_setting:
                         backend_route.append(route_setting)
 
+                    route_specific_settings = route.get("additional_settings", None)
+                    if route_specific_settings:
+                        backend_route.append(route_specific_settings)
+
                     backend_routes.append(" ".join(backend_route))
 
     return sorted(backend_routes)
-
 
 def get_route_health_check(details, service_alias, default_health_check):
     health_check = get_service_attribute(details, "health_check", service_alias)

@@ -2,12 +2,14 @@ import logging
 import subprocess
 import thread
 
-from haproxy.config import HAPROXY_RUN_COMMAND
+from haproxy.config import HAPROXY_RUN_COMMAND, DRYRUN
 
 logger = logging.getLogger("haproxy")
 
 
 def run_once():
+    if DRYRUN:
+      return
     logger.info("Launching HAProxy")
     p = subprocess.Popen(HAPROXY_RUN_COMMAND)
     logger.info("HAProxy has been launched(PID: %s)", str(p.pid))
@@ -16,6 +18,8 @@ def run_once():
 
 
 def run_reload(old_process):
+    if DRYRUN:
+      return
     if old_process:
         # Reload haproxy
         logger.info("Reloading HAProxy")
@@ -32,5 +36,7 @@ def run_reload(old_process):
 
 
 def wait_pid(process):
+    if DRYRUN:
+      return
     process.wait()
     logger.info("HAProxy(PID:%s) has been terminated" % str(process.pid))

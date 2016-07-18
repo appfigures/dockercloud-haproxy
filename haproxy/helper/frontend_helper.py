@@ -1,15 +1,13 @@
 from collections import OrderedDict
 
 from haproxy.config import EXTRA_BIND_SETTINGS, EXTRA_FRONTEND_SETTINGS, MONITOR_URI, MONITOR_PORT, MAXCONN, \
-    SKIP_FORWARDED_PROTO
+    SKIP_FORWARDED_PROTO, ADDITIONAL_BACKENDS
 
 
 def check_require_default_route(routes, routes_added):
     require_default_route = False
-    all_routes = []
-    for route_list in routes.itervalues():
-        all_routes.extend(route_list)
-    if len(routes_added) < len(all_routes):
+    required_routes = len(routes.values()) + len(ADDITIONAL_BACKENDS.values())
+    if len(routes_added) < required_routes:
         require_default_route = True
 
     return require_default_route

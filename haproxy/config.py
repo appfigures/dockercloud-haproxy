@@ -1,7 +1,6 @@
 import os
 import re
 
-
 def parse_extra_bind_settings(extra_bind_settings):
     bind_dict = {}
     if extra_bind_settings:
@@ -28,8 +27,25 @@ def parse_extra_frontend_settings(envvars):
                     settings_dict[port] = settings
     return settings_dict
 
+def parse_additional_backends(additional_backend_settings):
+  # in form: service_name,backend_name,host:port[,opts];[service_name,backend_name,host:port[,opts]]
+  additional_backends = {}
+  if not additional_backend_settings:
+    return additional_backends
+  for backend in additional_backend_settings.split(";"):
+    parts = backend.split(",")
+    if len(parts) == 3:
+      parts.append("")
+    service_name, backend_name, backend_desc, opts = parts
+    service = additional_backends.get(service_name, [])
+    addr, port = backend_desc.split(":")
+    route = {"addr":addr, "port": port, "container_name":backend_name, "settings":opts}
+    service.append(route)
+    additional_backends[service_name] = service
+  return additional_backends
 
 # envvar
+ADDITIONAL_BACKENDS = parse_additional_backends(os.getenv("ADDITIONAL_BACKENDS"))
 ADDITIONAL_SERVICES = os.getenv("ADDITIONAL_SERVICES")
 API_AUTH = os.getenv("DOCKERCLOUD_AUTH")
 BALANCE = os.getenv("BALANCE", "roundrobin")
@@ -38,6 +54,7 @@ CERT_FOLDER = os.getenv("CERT_FOLDER")
 DEBUG = os.getenv("DEBUG", False)
 DEFAULT_CA_CERT = os.getenv("CA_CERT")
 DEFAULT_SSL_CERT = os.getenv("DEFAULT_SSL_CERT") or os.getenv("SSL_CERT")
+DRYRUN = os.getenv("DRYRUN", False)
 EXTRA_BIND_SETTINGS = parse_extra_bind_settings(os.getenv("EXTRA_BIND_SETTINGS"))
 EXTRA_DEFAULT_SETTINGS = os.getenv("EXTRA_DEFAULT_SETTINGS")
 EXTRA_FRONTEND_SETTINGS = parse_extra_frontend_settings(os.environ)
