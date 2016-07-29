@@ -1,13 +1,12 @@
 FROM alpine:edge
 MAINTAINER Feng Honglin <hfeng@tutum.co>
 
-COPY . /haproxy-src
 
-RUN apk update && \
-    apk --no-cache add tini pkgconf haproxy py-pip build-base python-dev ca-certificates && \
-    cp /haproxy-src/reload.sh /reload.sh && \
+RUN apk update && apk --no-cache add tini pkgconf haproxy py-pip build-base python-dev ca-certificates
+RUN pip install -U setuptools gevent
+COPY . /haproxy-src
+RUN cp /haproxy-src/reload.sh /reload.sh && \
     cd /haproxy-src && \
-    pip install -U setuptools && \
     pip install -r requirements.txt && \
     pip install . && \
     apk del build-base python-dev && \

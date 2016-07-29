@@ -4,7 +4,7 @@ from haproxy.config import HEALTH_CHECK, HTTP_BASIC_AUTH, EXTRA_ROUTE_SETTINGS, 
 from haproxy.utils import get_service_attribute
 
 
-def get_backend_section(details, routes, vhosts, service_alias, routes_added):
+def get_backend_section(details, routes_by_service, vhosts, service_alias, routes_added):
     backend = []
 
     backend_websocket_setting = get_websocket_setting(vhosts, service_alias)
@@ -13,44 +13,67 @@ def get_backend_section(details, routes, vhosts, service_alias, routes_added):
     backend_settings, is_sticky = get_backend_settings(details, service_alias, HTTP_BASIC_AUTH)
     backend.extend(backend_settings)
 
+    vhosted_services = set(v["service_name"] for v in vhosts)
+    current_service = service_alias or "default_service"
+
+    all_routes_by_service = merge_with_additional_routes(routes_by_service)
+
     route_health_check = get_route_health_check(details, service_alias, HEALTH_CHECK)
     extra_route_settings = get_extra_route_settings(details, service_alias, EXTRA_ROUTE_SETTINGS)
-    route_setting = " ".join([route_health_check, extra_route_settings]).strip()
-    backend_routes = get_backend_routes(route_setting, is_sticky, routes, routes_added, service_alias)
+    valid_services = {}
+
+    for service, routes in all_routes_by_service.items():
+        current_service = service == service_alias
+        other_vhost_service = service in vhosted_services
+        default_service = service_alias == "default_service"
+        if current_service or default_service or not other_vhost_service:
+            for route in routes:
+                route["health_check"] = route_health_check
+                if "additional_settings" not in route:
+                    route["additional_settings"] = extra_route_settings
+            valid_services[service] = routes
+    backend_routes = get_backend_routes(is_sticky, valid_services, routes_added, service_alias)
     backend.extend(backend_routes)
     return backend
 
 def merge_with_additional_routes(routes):
-  if not routes:
-    routes = {}
-  all_services = set(routes.keys() + ADDITIONAL_BACKENDS.keys())
-  for service in all_services:
-    yield service, routes.get(service, []) + ADDITIONAL_BACKENDS.get(service, [])
+    results = {}
+    if not routes:
+        routes = {}
+    all_services = set(routes.keys() + ADDITIONAL_BACKENDS.keys())
+    for service in all_services:
+        if not service:
+            service = "default_service"
+        results[service] = routes.get(service, []) + ADDITIONAL_BACKENDS.get(service, [])
+    return results
 
-def get_backend_routes(route_setting, is_sticky, routes, routes_added, service_alias):
+def get_backend_routes(is_sticky, routes_by_service, routes_added, service_alias):
     backend_routes = []
-    for _service_alias, routes in merge_with_additional_routes(routes):
-        if not service_alias or _service_alias == service_alias:
-            addresses_added = []
-            for route in routes:
-                # avoid adding those tcp routes adding http backends
-                if route in routes_added:
-                    continue
-                address = "%s:%s" % (route["addr"], route["port"])
-                if address not in addresses_added:
-                    addresses_added.append(address)
-                    backend_route = ["server %s %s" % (route["container_name"], address)]
-                    if is_sticky:
-                        backend_route.append("cookie %s" % route["container_name"])
+    for _service_alias, routes in routes_by_service.items():
+        addresses_added = []
+        for route in routes:
+            # avoid adding those tcp routes adding http backends
+            if route in routes_added:
+                continue
+            address = "%s:%s" % (route["addr"], route["port"])
+            if address not in addresses_added:
+                addresses_added.append(address)
+                backend_route = ["server %s %s" % (route["container_name"], address)]
+                if is_sticky:
+                    backend_route.append("cookie %s" % route["container_name"])
 
-                    if route_setting:
-                        backend_route.append(route_setting)
+                health_check = route.get("health_check", None)
+                if health_check:
+                    backend_route.append(health_check)
 
-                    route_specific_settings = route.get("additional_settings", None)
-                    if route_specific_settings:
-                        backend_route.append(route_specific_settings)
+                route_specific_settings = route.get("additional_settings", None)
+                if route_specific_settings:
+                    backend_route.append(route_specific_settings)
 
-                    backend_routes.append(" ".join(backend_route))
+                backend_route.append( "# ;" + _service_alias + ";")
+
+
+                backend_routes.append(" ".join(backend_route))
 
     return sorted(backend_routes)
 

@@ -33,13 +33,13 @@ def parse_additional_backends(additional_backend_settings):
   if not additional_backend_settings:
     return additional_backends
   for backend in additional_backend_settings.split(";"):
-    parts = backend.split(",")
+    parts = backend.split(",", 4)
     if len(parts) == 3:
       parts.append("")
     service_name, backend_name, backend_desc, opts = parts
     service = additional_backends.get(service_name, [])
     addr, port = backend_desc.split(":")
-    route = {"addr":addr, "port": port, "container_name":backend_name, "settings":opts}
+    route = {"addr":addr, "port": port, "container_name":backend_name, "additional_settings":opts, "is_additional":True}
     service.append(route)
     additional_backends[service_name] = service
   return additional_backends
